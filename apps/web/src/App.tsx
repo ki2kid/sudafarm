@@ -1,19 +1,43 @@
-import { Button } from "@workspace/ui/components/button"
+import { Navigate, Route, Routes } from "react-router"
+
+import { useAuth } from "./auth/auth-context"
+import { DashboardPage } from "./pages/dashboard-page"
+import { LoginPage } from "./pages/login-page"
+
+function LoadingPage() {
+  return (
+    <main className="flex min-h-svh items-center justify-center" dir="rtl">
+      جار التحميل...
+    </main>
+  )
+}
+
+function ProtectedRoutes() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <LoadingPage />
+  }
+
+  return user ? <DashboardPage /> : <Navigate replace to="/login" />
+}
+
+function PublicRoutes() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <LoadingPage />
+  }
+
+  return user ? <Navigate replace to="/dashboard" /> : <LoginPage />
+}
 
 export function App() {
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="text-muted-foreground font-mono text-xs">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/login" element={<PublicRoutes />} />
+      <Route path="/dashboard" element={<ProtectedRoutes />} />
+      <Route path="*" element={<Navigate replace to="/dashboard" />} />
+    </Routes>
   )
 }

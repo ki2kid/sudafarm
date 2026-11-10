@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "ninja",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -85,6 +86,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": dj_database_url.config(default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
+if (
+    DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3"
+    and not Path(DATABASES["default"]["NAME"]).is_absolute()
+):
+    DATABASES["default"]["NAME"] = BASE_DIR / DATABASES["default"]["NAME"]
 
 
 # Password validation
@@ -146,4 +152,14 @@ MAILERS = {
 # https://pypi.org/project/django-cors-headers/
 CORS_ALLOWED_ORIGINS = [
     o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o
+]
+CSRF_TRUSTED_ORIGINS = [
+    o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o
+]
+if DEBUG and "http://localhost:5173" not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append("http://localhost:5173")
+
+AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.UsernameOrPhoneBackend",
 ]
