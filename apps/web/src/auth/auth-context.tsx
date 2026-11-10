@@ -6,6 +6,7 @@ export type User = {
   username: string
   phone: string
   arabic_full_name: string
+  is_superuser: boolean
 }
 
 type ApiError = {

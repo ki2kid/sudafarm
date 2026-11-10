@@ -12,7 +12,7 @@ export function LoginPage() {
   return (
     <div className="bg-muted/30 min-h-svh" dir="rtl">
       <Navbar />
-      <main className="flex min-h-[calc(100svh-4rem)] items-center justify-center p-6">
+      <main id="main-content" className="flex min-h-[calc(100svh-4rem)] items-center justify-center p-6">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle>تسجيل الدخول</CardTitle>

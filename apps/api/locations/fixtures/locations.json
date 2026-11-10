@@ -1,0 +1,56 @@
+[
+  {
+    "model": "locations.state",
+    "pk": 1,
+    "fields": {
+      "name_ar": "الخرطوم",
+      "name_en": "Khartoum",
+      "code": "001"
+    }
+  },
+  {
+    "model": "locations.state",
+    "pk": 2,
+    "fields": {
+      "name_ar": "بورتسودان",
+      "name_en": "Port Sudan",
+      "code": "002"
+    }
+  },
+  {
+    "model": "locations.locality",
+    "pk": 1,
+    "fields": {
+      "state": 1,
+      "name_ar": "امدرمان",
+      "name_en": "Omdurman"
+    }
+  },
+  {
+    "model": "locations.locality",
+    "pk": 2,
+    "fields": {
+      "state": 2,
+      "name_ar": "بورتسودان",
+      "name_en": "Port Sudan"
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 1,
+    "fields": {
+      "locality": 1,
+      "name_ar": "حي الروضة",
+      "name_en": "Al Rawda District"
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 2,
+    "fields": {
+      "locality": 2,
+      "name_ar": "ديم مدينة",
+      "name_en": "Dim City"
+    }
+  }
+]

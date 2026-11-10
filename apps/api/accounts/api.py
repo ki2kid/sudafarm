@@ -23,6 +23,7 @@ class UserOut(Schema):
     username: str
     phone: str
     arabic_full_name: str
+    is_superuser: bool
 
 
 class MessageOut(Schema):
