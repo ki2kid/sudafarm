@@ -19,7 +19,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
+    <header className="border-border bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
       <a
         className="focus:bg-background focus:text-foreground absolute start-2 top-2 -translate-y-20 rounded-md px-3 py-2 text-sm focus:translate-y-0"
         href="#main-content"
