@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
-import { MessageCircle, Phone, Trash2 } from "lucide-react"
+import { ArrowDownUp, MessageCircle, Phone, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react"
 
-import { buttonVariants } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { useAuth } from "../auth/auth-context"
@@ -40,6 +40,7 @@ type Listing = {
 }
 
 type Filter = "all" | "sell" | "buy" | "mine"
+type SortOption = "newest" | "oldest" | "price_asc" | "price_desc"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -187,18 +188,133 @@ const FILTER_TABS: { value: Filter; label: string }[] = [
   { value: "mine", label: "إعلاناتي" },
 ]
 
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "newest", label: "الأحدث" },
+  { value: "oldest", label: "الأقدم" },
+  { value: "price_asc", label: "السعر: من الأقل" },
+  { value: "price_desc", label: "السعر: من الأعلى" },
+]
+
 const CATEGORY_FILTER_OPTIONS = [
   { value: "all", label: "كل المنتجات" },
   ...Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
 ]
 
+function FiltersContent({
+  filter,
+  onFilterChange,
+  categoryFilter,
+  onCategoryChange,
+  sortOption,
+  onSortChange,
+}: {
+  filter: Filter
+  onFilterChange: (value: Filter) => void
+  categoryFilter: string
+  onCategoryChange: (value: string) => void
+  sortOption: SortOption
+  onSortChange: (value: SortOption) => void
+}) {
+  return (
+    <div className="space-y-5">
+      {/* Type tabs */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-muted-foreground">نوع الإعلان</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => onFilterChange(tab.value)}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                filter === tab.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sort options */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+          <ArrowDownUp className="size-3.5" aria-hidden="true" />
+          <span>الترتيب</span>
+        </h3>
+        <div className="flex flex-col gap-1.5">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSortChange(opt.value)}
+              className={`w-full rounded-lg border px-3 py-1.5 text-start text-xs font-medium transition-colors ${
+                sortOption === opt.value
+                  ? "bg-primary/10 text-primary border-primary/40 font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Category filter */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-muted-foreground">الفئة</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onCategoryChange(opt.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                categoryFilter === opt.value
+                  ? "bg-secondary text-secondary-foreground border-secondary"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ListingsPage() {
   const { user } = useAuth()
   const [filter, setFilter] = useState<Filter>("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [sortOption, setSortOption] = useState<SortOption>("newest")
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  const activeFilterCount =
+    (filter !== "all" ? 1 : 0) +
+    (categoryFilter !== "all" ? 1 : 0) +
+    (sortOption !== "newest" ? 1 : 0)
+
+  function resetFilters() {
+    setFilter("all")
+    setCategoryFilter("all")
+    setSortOption("newest")
+  }
+
+  useEffect(() => {
+    if (!mobileFiltersOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileFiltersOpen(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [mobileFiltersOpen])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -223,6 +339,20 @@ export function ListingsPage() {
     void load()
   }, [filter, categoryFilter])
 
+  const sortedListings = useMemo(() => {
+    const copy = [...listings]
+    if (sortOption === "newest") {
+      copy.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    } else if (sortOption === "oldest") {
+      copy.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    } else if (sortOption === "price_asc") {
+      copy.sort((a, b) => Number(a.price) - Number(b.price))
+    } else if (sortOption === "price_desc") {
+      copy.sort((a, b) => Number(b.price) - Number(a.price))
+    }
+    return copy
+  }, [listings, sortOption])
+
   async function handleDelete(id: number) {
     if (!window.confirm("هل أنت متأكد من حذف هذا الإعلان؟")) return
     try {
@@ -245,7 +375,7 @@ export function ListingsPage() {
   return (
     <div className="bg-muted/30 min-h-svh" dir="rtl">
       <Navbar />
-      <main id="main-content" className="mx-auto max-w-5xl space-y-6 p-6">
+      <main id="main-content" className="mx-auto max-w-6xl space-y-6 p-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -255,73 +385,179 @@ export function ListingsPage() {
           <Link to="/listings/create" className={buttonVariants()}>نشر إعلان جديد</Link>
         </div>
 
-        {/* Filters */}
-        <div className="space-y-3">
-          {/* Type tabs */}
-          <div className="flex flex-wrap gap-2">
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.value}
+        {/* Mobile filter toolbar */}
+        <div className="flex items-center justify-between gap-3 lg:hidden">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMobileFiltersOpen(true)}
+            >
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              <span>تصفية وترتيب</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            {activeFilterCount > 0 && (
+              <Button
                 type="button"
-                onClick={() => setFilter(tab.value)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                  filter === tab.value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="text-muted-foreground"
               >
-                {tab.label}
-              </button>
-            ))}
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                <span>إعادة تعيين</span>
+              </Button>
+            )}
           </div>
-
-          {/* Category filter */}
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_FILTER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setCategoryFilter(opt.value)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  categoryFilter === opt.value
-                    ? "bg-secondary text-secondary-foreground border-secondary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          {!loading && !error && (
+            <span className="text-muted-foreground text-xs">
+              {sortedListings.length} إعلان
+            </span>
+          )}
         </div>
 
-        {/* Content */}
-        {loading && (
-          <p className="text-muted-foreground text-sm" role="status">جار تحميل الإعلانات…</p>
-        )}
-        {error && (
-          <p className="text-destructive text-sm" role="alert">{error}</p>
-        )}
+        {/* Layout: Sidebar (desktop) + Listings grid */}
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr] lg:items-start">
+          {/* Desktop Sidebar */}
+          <aside className="hidden lg:block sticky top-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <SlidersHorizontal className="size-4 text-muted-foreground" aria-hidden="true" />
+                    <span>تصفية وترتيب</span>
+                  </CardTitle>
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+                    >
+                      <RotateCcw className="size-3" aria-hidden="true" />
+                      <span>إعادة تعيين</span>
+                    </button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <FiltersContent
+                  filter={filter}
+                  onFilterChange={setFilter}
+                  categoryFilter={categoryFilter}
+                  onCategoryChange={setCategoryFilter}
+                  sortOption={sortOption}
+                  onSortChange={setSortOption}
+                />
+              </CardContent>
+            </Card>
+          </aside>
 
-        {!loading && !error && listings.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-              <p className="text-muted-foreground">لا توجد إعلانات مطابقة.</p>
-              <Link to="/listings/create" className={buttonVariants({ variant: "outline" })}>كن أول من ينشر إعلاناً</Link>
-            </CardContent>
-          </Card>
-        )}
+          {/* Content */}
+          <section className="min-w-0 space-y-4">
+            {loading && (
+              <p className="text-muted-foreground text-sm" role="status">جار تحميل الإعلانات…</p>
+            )}
+            {error && (
+              <p className="text-destructive text-sm" role="alert">{error}</p>
+            )}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {listings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              currentUserId={user?.id}
-              onDelete={handleDelete}
-            />
-          ))}
+            {!loading && !error && listings.length === 0 && (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                  <p className="text-muted-foreground">لا توجد إعلانات مطابقة.</p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button type="button" variant="outline" onClick={resetFilters}>
+                        إعادة تعيين الفلاتر
+                      </Button>
+                    )}
+                    <Link to="/listings/create" className={buttonVariants({ variant: "outline" })}>
+                      كن أول من ينشر إعلاناً
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {sortedListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  currentUserId={user?.id}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          </section>
         </div>
       </main>
+
+      {/* Mobile Floating Filter Drawer */}
+      {mobileFiltersOpen && (
+        <div
+          className="fixed inset-0 z-50 flex lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="تصفية وترتيب الإعلانات"
+        >
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => setMobileFiltersOpen(false)}
+          />
+          <div className="bg-background border-e relative z-10 flex h-full w-full max-w-xs flex-col shadow-xl">
+            <div className="border-border flex items-center justify-between border-b px-5 py-4">
+              <h2 className="text-base font-semibold flex items-center gap-2">
+                <SlidersHorizontal className="size-4 text-muted-foreground" aria-hidden="true" />
+                <span>تصفية وترتيب</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                aria-label="إغلاق"
+                className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <FiltersContent
+                filter={filter}
+                onFilterChange={setFilter}
+                categoryFilter={categoryFilter}
+                onCategoryChange={setCategoryFilter}
+                sortOption={sortOption}
+                onSortChange={setSortOption}
+              />
+            </div>
+
+            <div className="border-border flex items-center gap-2 border-t p-4">
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => setMobileFiltersOpen(false)}
+              >
+                عرض النتائج ({sortedListings.length})
+              </Button>
+              {activeFilterCount > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetFilters}
+                >
+                  إعادة تعيين
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
