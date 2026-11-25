@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router"
-import { Megaphone, MessageCircle, Phone, Plus } from "lucide-react"
+import { Megaphone, MessageCircle, Phone, Plus, UserCog } from "lucide-react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
@@ -84,21 +84,6 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {user?.bio && <p className="text-sm">{user.bio}</p>}
-            <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
-              {user?.allow_whatsapp && (
-                <span className="inline-flex items-center gap-1">
-                  <MessageCircle className="size-3" aria-hidden="true" />
-                  واتساب
-                </span>
-              )}
-              {user?.allow_call && (
-                <span className="inline-flex items-center gap-1">
-                  <Phone className="size-3" aria-hidden="true" />
-                  مكالمات
-                </span>
-              )}
-            </div>
-
             {/* Quick actions */}
             <div className="flex flex-wrap gap-3 pt-1">
               <Link

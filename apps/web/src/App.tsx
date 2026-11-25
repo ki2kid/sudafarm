@@ -9,6 +9,7 @@ import { LoginPage } from "./pages/login-page"
 import { RegisterPage } from "./pages/register-page"
 import { ListingsPage } from "./pages/listings-page"
 import { CreateListingPage } from "./pages/create-listing-page"
+import { ProfilePage } from "./pages/profile-page"
 
 function LoadingPage() {
   return (
@@ -41,6 +42,7 @@ export function App() {
         <Route path="/dashboard"       element={<ProtectedRoutes><DashboardPage /></ProtectedRoutes>} />
         <Route path="/listings"        element={<ProtectedRoutes><ListingsPage /></ProtectedRoutes>} />
         <Route path="/listings/create" element={<ProtectedRoutes><CreateListingPage /></ProtectedRoutes>} />
+        <Route path="/profile"         element={<ProtectedRoutes><ProfilePage /></ProtectedRoutes>} />
         <Route path="/locations"       element={<ProtectedRoutes><LocationsPage /></ProtectedRoutes>} />
 
         <Route path="*" element={<Navigate replace to="/dashboard" />} />

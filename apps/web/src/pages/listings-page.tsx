@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react"
+import type { FormEvent } from "react"
 import { Link } from "react-router"
-import { ArrowDownUp, MessageCircle, Phone, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react"
+import { ArrowDownUp, MessageCircle, Pencil, Phone, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react"
 import { toast } from "../components/toaster"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
@@ -70,6 +74,7 @@ function ListingCard({
   listing,
   currentUserId,
   now,
+  onEdit,
   onDelete,
   onRenew,
   renewing,
@@ -77,6 +82,7 @@ function ListingCard({
   listing: Listing
   currentUserId: number | undefined
   now: number
+  onEdit: (listing: Listing) => void
   onDelete: (id: number) => void
   onRenew: (id: number) => void
   renewing: boolean
@@ -110,15 +116,26 @@ function ListingCard({
             <CardTitle className="text-base leading-tight">{listing.product_name}</CardTitle>
           </div>
           {isOwner && (
-            <button
-              type="button"
-              onClick={() => onDelete(listing.id)}
-              title="حذف الإعلان"
-              className="text-muted-foreground hover:text-destructive shrink-0 rounded p-1 transition-colors"
-              aria-label="حذف الإعلان"
-            >
-              <Trash2 className="size-4" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => onEdit(listing)}
+                title="تعديل الإعلان"
+                className="text-muted-foreground hover:text-foreground rounded p-1 transition-colors"
+                aria-label="تعديل الإعلان"
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(listing.id)}
+                title="حذف الإعلان"
+                className="text-muted-foreground hover:text-destructive rounded p-1 transition-colors"
+                aria-label="حذف الإعلان"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -341,6 +358,15 @@ export function ListingsPage() {
   const [sortOption, setSortOption] = useState<SortOption>("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [renewingId, setRenewingId] = useState<number | null>(null)
+  const [editTarget, setEditTarget] = useState<Listing | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editType, setEditType] = useState<ListingType>("sell")
+  const [editCategory, setEditCategory] = useState("")
+  const [editName, setEditName] = useState("")
+  const [editPrice, setEditPrice] = useState("")
+  const [editQuantity, setEditQuantity] = useState("")
+  const [editUnit, setEditUnit] = useState<Unit>("kg")
+  const [editDescription, setEditDescription] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -363,16 +389,17 @@ export function ListingsPage() {
   }
 
   useEffect(() => {
-    if (!mobileFiltersOpen && !deleteTarget) return
+    if (!mobileFiltersOpen && !deleteTarget && !editTarget) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (deleteTarget && !deleting) setDeleteTarget(null)
+        if (editTarget && !savingEdit) setEditTarget(null)
+        else if (deleteTarget && !deleting) setDeleteTarget(null)
         else if (mobileFiltersOpen) setMobileFiltersOpen(false)
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [mobileFiltersOpen, deleteTarget, deleting])
+  }, [mobileFiltersOpen, deleteTarget, deleting, editTarget, savingEdit])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -414,6 +441,65 @@ export function ListingsPage() {
     }
     return copy
   }, [listings, sortOption])
+
+  function openEditModal(listing: Listing) {
+    setEditTarget(listing)
+    setEditType(listing.listing_type)
+    setEditCategory(String(listing.product_category))
+    setEditName(listing.product_name)
+    setEditPrice(String(listing.price))
+    setEditQuantity(String(listing.quantity))
+    setEditUnit(listing.unit)
+    setEditDescription(listing.description)
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editTarget) return
+    if (!editName.trim()) {
+      toast.error("يرجى إدخال اسم المنتج.")
+      return
+    }
+    if (Number(editPrice) <= 0) {
+      toast.error("يرجى إدخال سعر صحيح.")
+      return
+    }
+    if (Number(editQuantity) <= 0) {
+      toast.error("يرجى إدخال كمية صحيحة.")
+      return
+    }
+
+    setSavingEdit(true)
+    try {
+      const csrf = await getCsrfToken()
+      const res = await fetch(`/api/listings/${editTarget.id}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({
+          listing_type: editType,
+          product_category: editCategory,
+          product_name: editName.trim(),
+          price: Number(editPrice),
+          quantity: Number(editQuantity),
+          unit: editUnit,
+          description: editDescription.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { detail?: string }
+        throw new Error(body.detail ?? "تعذر تحديث الإعلان.")
+      }
+      const updated = (await res.json()) as Listing
+      setListings((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))
+      setEditTarget(null)
+      toast.success("تم تحديث الإعلان بنجاح.")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "تعذر تحديث الإعلان.")
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   function requestDelete(id: number) {
     const target = listings.find((l) => l.id === id) ?? null
@@ -588,6 +674,7 @@ export function ListingsPage() {
                   listing={listing}
                   currentUserId={user?.id}
                   now={now}
+                  onEdit={openEditModal}
                   onDelete={requestDelete}
                   onRenew={handleRenew}
                   renewing={renewingId === listing.id}
@@ -658,6 +745,177 @@ export function ListingsPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Edit Listing Dialog */}
+      {editTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-dialog-title"
+        >
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => {
+              if (!savingEdit) setEditTarget(null)
+            }}
+          />
+          <Card className="relative z-10 max-h-[90svh] w-full max-w-lg overflow-y-auto shadow-xl">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle id="edit-dialog-title" className="text-base">
+                تعديل الإعلان
+              </CardTitle>
+              <button
+                type="button"
+                disabled={savingEdit}
+                onClick={() => setEditTarget(null)}
+                aria-label="إغلاق"
+                className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={handleEditSubmit}>
+                <div className="space-y-2">
+                  <Label>نوع الإعلان</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={editType === "sell" ? "default" : "outline"}
+                      onClick={() => setEditType("sell")}
+                    >
+                      عرض بيع
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={editType === "buy" ? "default" : "outline"}
+                      onClick={() => setEditType("buy")}
+                    >
+                      طلب شراء
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-category">الفئة</Label>
+                    <Select
+                      value={editCategory}
+                      onValueChange={(value) => {
+                        if (value) setEditCategory(value)
+                      }}
+                    >
+                      <SelectTrigger id="edit-category">
+                        <SelectValue>
+                          {CATEGORY_LABELS[editCategory] ?? editCategory}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name">اسم المنتج</Label>
+                    <Input
+                      id="edit-name"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-price">السعر (جنيه)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      min="1"
+                      step="any"
+                      dir="ltr"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-quantity">الكمية</Label>
+                    <Input
+                      id="edit-quantity"
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      dir="ltr"
+                      value={editQuantity}
+                      onChange={(e) => setEditQuantity(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-unit">الوحدة</Label>
+                    <Select
+                      value={editUnit}
+                      onValueChange={(value) => {
+                        if (value) setEditUnit(value as Unit)
+                      }}
+                    >
+                      <SelectTrigger id="edit-unit">
+                        <SelectValue>
+                          {UNIT_LABELS[editUnit] ?? editUnit}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(UNIT_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">الوصف</Label>
+                  <textarea
+                    id="edit-description"
+                    rows={3}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-3"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={savingEdit}
+                    onClick={() => setEditTarget(null)}
+                  >
+                    إلغاء
+                  </Button>
+                  <Button type="submit" disabled={savingEdit}>
+                    {savingEdit ? "جار الحفظ…" : "حفظ التعديلات"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -36,6 +36,16 @@ export type RegisterPayload = {
   bio: string
 }
 
+export type ProfileUpdatePayload = {
+  arabic_full_name?: string
+  allow_whatsapp?: boolean
+  whatsapp_number?: string
+  allow_call?: boolean
+  call_phone?: string
+  locality_id?: number | null
+  bio?: string
+}
+
 type ApiError = {
   detail?: string
 }
@@ -47,6 +57,7 @@ type AuthContextValue = {
   error: string
   login: (event: FormEvent<HTMLFormElement>) => Promise<void>
   register: (payload: RegisterPayload) => Promise<boolean>
+  updateProfile: (payload: ProfileUpdatePayload) => Promise<boolean>
   logout: () => Promise<void>
 }
 
@@ -143,6 +154,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function updateProfile(payload: ProfileUpdatePayload): Promise<boolean> {
+    setSubmitting(true)
+    setError("")
+    try {
+      const csrfToken = await getCsrfToken()
+      const response = await fetch("/api/auth/profile", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        throw new Error(await readError(response, "تعذر تحديث الملف الشخصي."))
+      }
+      const updatedUser = (await response.json()) as User
+      setUser(updatedUser)
+      toast.success("تم تحديث الملف الشخصي بنجاح.")
+      return true
+    } catch (updateError) {
+      const message = updateError instanceof Error ? updateError.message : "تعذر تحديث الملف الشخصي."
+      setError(message)
+      toast.error(message)
+      return false
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function logout() {
     setSubmitting(true)
     setError("")
@@ -168,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, submitting, error, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, submitting, error, login, register, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   )

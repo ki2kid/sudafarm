@@ -37,6 +37,16 @@ class RenewListingIn(Schema):
     duration_days: int = DEFAULT_EXPIRY_DAYS
 
 
+class ListingUpdateIn(Schema):
+    listing_type: Listing.ListingType | None = None
+    product_category: Listing.ProductCategory | None = None
+    product_name: str | None = None
+    price: Decimal | None = None
+    quantity: Decimal | None = None
+    unit: Listing.Unit | None = None
+    description: str | None = None
+
+
 class ListingOut(Schema):
     id: int
     listing_type: Listing.ListingType
@@ -198,4 +208,39 @@ def renew_listing(request, listing_id: int, payload: RenewListingIn | None = Non
     listing.is_active = True
     listing.expires_at = timezone.now() + timedelta(days=duration)
     listing.save(update_fields=["is_active", "expires_at"])
+    return 200, listing
+
+
+@router.put("/{listing_id}", response={200: ListingOut, 400: MessageOut, 401: MessageOut, 403: MessageOut, 404: MessageOut})
+@csrf_protected
+def update_listing(request, listing_id: int, payload: ListingUpdateIn):
+    if not request.user.is_authenticated:
+        return 401, {"detail": str(_("Authentication required."))}
+
+    try:
+        listing = Listing.objects.select_related("author__locality__state").get(pk=listing_id)
+    except Listing.DoesNotExist:
+        return 404, {"detail": str(_("Listing not found."))}
+
+    if listing.author_id != request.user.pk and not request.user.is_superuser:
+        return 403, {"detail": str(_("You can only edit your own listings."))}
+
+    data = payload.dict(exclude_unset=True)
+    if "product_name" in data:
+        name = data["product_name"].strip()
+        if not name:
+            return 400, {"detail": str(_("Product name cannot be empty."))}
+        data["product_name"] = name
+    if "price" in data and data["price"] <= 0:
+        return 400, {"detail": str(_("Price must be greater than zero."))}
+    if "quantity" in data and data["quantity"] <= 0:
+        return 400, {"detail": str(_("Quantity must be greater than zero."))}
+    if "description" in data:
+        data["description"] = data["description"].strip()
+
+    for field, value in data.items():
+        setattr(listing, field, value)
+
+    if data:
+        listing.save(update_fields=list(data.keys()))
     return 200, listing

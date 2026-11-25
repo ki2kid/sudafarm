@@ -1,4 +1,4 @@
-import { LayoutList, LogOut, Moon, Plus, Sun } from "lucide-react"
+import { LayoutList, LogOut, Moon, Plus, Sun, UserCog } from "lucide-react"
 import { Link } from "react-router"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
@@ -80,6 +80,16 @@ export function Navbar() {
                 aria-label="الإعلانات"
               >
                 <LayoutList className="size-4" aria-hidden="true" />
+              </Link>
+
+              {/* Profile */}
+              <Link
+                to="/profile"
+                className={buttonVariants({ variant: "ghost", size: "icon" })}
+                title="الملف الشخصي"
+                aria-label="الملف الشخصي"
+              >
+                <UserCog className="size-4" aria-hidden="true" />
               </Link>
 
               {/* Logout */}
