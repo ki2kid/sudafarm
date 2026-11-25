@@ -61,10 +61,6 @@ function daysLeft(iso: string): { text: string; urgent: boolean } {
   return { text: `ينتهي خلال ${days} يوماً`, urgent: false }
 }
 
-function formatPhone(raw: string): string {
-  return raw.replace(/[^\d+]/g, "")
-}
-
 function waUrl(phone: string): string {
   return `https://wa.me/${phone.replace(/[^\d]/g, "")}`
 }
@@ -205,21 +201,26 @@ export function ListingsPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    setLoading(true)
-    setError("")
     const params = new URLSearchParams()
     if (filter === "sell") params.set("listing_type", "sell")
     else if (filter === "buy") params.set("listing_type", "buy")
     else if (filter === "mine") params.set("my_listings", "true")
     if (categoryFilter !== "all") params.set("product_category", categoryFilter)
 
-    fetch(`/api/listings?${params.toString()}`, { credentials: "same-origin" })
-      .then(async (res) => {
+    async function load() {
+      setLoading(true)
+      setError("")
+      try {
+        const res = await fetch(`/api/listings?${params.toString()}`, { credentials: "same-origin" })
         if (!res.ok) throw new Error("تعذر تحميل الإعلانات.")
         setListings((await res.json()) as Listing[])
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات."))
-      .finally(() => setLoading(false))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
   }, [filter, categoryFilter])
 
   async function handleDelete(id: number) {

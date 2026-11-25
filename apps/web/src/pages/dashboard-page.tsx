@@ -43,18 +43,21 @@ export function DashboardPage() {
   const [directoryError, setDirectoryError] = useState("")
 
   useEffect(() => {
-    setLoadingDirectory(true)
-    setDirectoryError("")
     const query = filter === "all" ? "" : `?account_type=${filter}`
-    fetch(`/api/auth/directory${query}`, { credentials: "same-origin" })
-      .then(async (response) => {
+    async function load() {
+      setLoadingDirectory(true)
+      setDirectoryError("")
+      try {
+        const response = await fetch(`/api/auth/directory${query}`, { credentials: "same-origin" })
         if (!response.ok) throw new Error("تعذر تحميل دليل الحسابات.")
         setAccounts((await response.json()) as DirectoryAccount[])
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         setDirectoryError(loadError instanceof Error ? loadError.message : "تعذر تحميل دليل الحسابات.")
-      })
-      .finally(() => setLoadingDirectory(false))
+      } finally {
+        setLoadingDirectory(false)
+      }
+    }
+    void load()
   }, [filter])
 
   return (
