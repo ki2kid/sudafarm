@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router"
-import { Megaphone, MessageCircle, Phone, Plus, UserCog } from "lucide-react"
+import { Megaphone, MessageCircle, Phone, Plus } from "lucide-react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
