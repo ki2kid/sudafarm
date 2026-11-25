@@ -3,8 +3,9 @@ import type { ReactNode } from "react"
 
 import { useAuth } from "./auth/auth-context"
 import { DashboardPage } from "./pages/dashboard-page"
-import { LoginPage } from "./pages/login-page"
 import { LocationsPage } from "./pages/locations-page"
+import { LoginPage } from "./pages/login-page"
+import { RegisterPage } from "./pages/register-page"
 
 function LoadingPage() {
   return (
@@ -24,20 +25,21 @@ function ProtectedRoutes({ children }: { children: ReactNode }) {
   return user ? children : <Navigate replace to="/login" />
 }
 
-function PublicRoutes() {
+function PublicOnlyRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
 
   if (loading) {
     return <LoadingPage />
   }
 
-  return user ? <Navigate replace to="/dashboard" /> : <LoginPage />
+  return user ? <Navigate replace to="/dashboard" /> : children
 }
 
 export function App() {
   return (
     <Routes>
-      <Route path="/login" element={<PublicRoutes />} />
+      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
       <Route path="/dashboard" element={<ProtectedRoutes><DashboardPage /></ProtectedRoutes>} />
       <Route path="/locations" element={<ProtectedRoutes><LocationsPage /></ProtectedRoutes>} />
       <Route path="*" element={<Navigate replace to="/dashboard" />} />

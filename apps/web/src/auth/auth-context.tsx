@@ -1,12 +1,37 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import type { FormEvent, ReactNode } from "react"
 
+export type AccountType = "farmer" | "trader"
+
 export type User = {
   id: number
   username: string
   phone: string
   arabic_full_name: string
   is_superuser: boolean
+  account_type: AccountType
+  allow_whatsapp: boolean
+  whatsapp_number: string
+  allow_call: boolean
+  call_phone: string
+  locality_id: number | null
+  locality_name_ar: string | null
+  state_name_ar: string | null
+  bio: string
+}
+
+export type RegisterPayload = {
+  username: string
+  phone: string
+  arabic_full_name: string
+  password: string
+  account_type: AccountType
+  allow_whatsapp: boolean
+  whatsapp_number: string
+  allow_call: boolean
+  call_phone: string
+  locality_id: number | null
+  bio: string
 }
 
 type ApiError = {
@@ -19,6 +44,7 @@ type AuthContextValue = {
   submitting: boolean
   error: string
   login: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  register: (payload: RegisterPayload) => Promise<boolean>
   logout: () => Promise<void>
 }
 
@@ -83,6 +109,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function register(payload: RegisterPayload): Promise<boolean> {
+    setSubmitting(true)
+    setError("")
+    try {
+      const csrfToken = await getCsrfToken()
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        throw new Error(await readError(response, "تعذر إنشاء الحساب."))
+      }
+      setUser((await response.json()) as User)
+      return true
+    } catch (registerError) {
+      setError(registerError instanceof Error ? registerError.message : "تعذر إنشاء الحساب.")
+      return false
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function logout() {
     setSubmitting(true)
     setError("")
@@ -105,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, submitting, error, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, submitting, error, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
