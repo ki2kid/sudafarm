@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "ninja",
     "accounts",
     "locations",
+    "listings",
 ]
 
 MIDDLEWARE = [
