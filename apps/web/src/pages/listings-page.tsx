@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
 import { ArrowDownUp, MessageCircle, Phone, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react"
+import { toast } from "../components/toaster"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
@@ -301,6 +302,8 @@ export function ListingsPage() {
   const [sortOption, setSortOption] = useState<SortOption>("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [renewingId, setRenewingId] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -317,13 +320,16 @@ export function ListingsPage() {
   }
 
   useEffect(() => {
-    if (!mobileFiltersOpen) return
+    if (!mobileFiltersOpen && !deleteTarget) return
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMobileFiltersOpen(false)
+      if (e.key === "Escape") {
+        if (deleteTarget && !deleting) setDeleteTarget(null)
+        else if (mobileFiltersOpen) setMobileFiltersOpen(false)
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [mobileFiltersOpen])
+  }, [mobileFiltersOpen, deleteTarget, deleting])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -362,8 +368,15 @@ export function ListingsPage() {
     return copy
   }, [listings, sortOption])
 
-  async function handleDelete(id: number) {
-    if (!window.confirm("هل أنت متأكد من حذف هذا الإعلان؟")) return
+  function requestDelete(id: number) {
+    const target = listings.find((l) => l.id === id) ?? null
+    setDeleteTarget(target)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    const id = deleteTarget.id
+    setDeleting(true)
     try {
       const csrf = await getCsrfToken()
       const res = await fetch(`/api/listings/${id}`, {
@@ -376,8 +389,12 @@ export function ListingsPage() {
         throw new Error(body.detail ?? "تعذر حذف الإعلان.")
       }
       setListings((prev) => prev.filter((l) => l.id !== id))
+      setDeleteTarget(null)
+      toast.success("تم حذف الإعلان.")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "تعذر حذف الإعلان.")
+      toast.error(err instanceof Error ? err.message : "تعذر حذف الإعلان.")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -397,8 +414,9 @@ export function ListingsPage() {
       }
       const updated = (await res.json()) as Listing
       setListings((prev) => prev.map((l) => (l.id === id ? updated : l)))
+      toast.success("تم تجديد الإعلان بنجاح.")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "تعذر تجديد الإعلان.")
+      toast.error(err instanceof Error ? err.message : "تعذر تجديد الإعلان.")
     } finally {
       setRenewingId(null)
     }
@@ -522,7 +540,7 @@ export function ListingsPage() {
                   key={listing.id}
                   listing={listing}
                   currentUserId={user?.id}
-                  onDelete={handleDelete}
+                  onDelete={requestDelete}
                   onRenew={handleRenew}
                   renewing={renewingId === listing.id}
                 />
@@ -590,6 +608,55 @@ export function ListingsPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+        >
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => {
+              if (!deleting) setDeleteTarget(null)
+            }}
+          />
+          <Card className="relative z-10 w-full max-w-sm shadow-xl">
+            <CardHeader>
+              <CardTitle id="delete-dialog-title" className="text-base">
+                تأكيد حذف الإعلان
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                هل أنت متأكد من حذف إعلان{" "}
+                <span className="text-foreground font-medium">«{deleteTarget.product_name}»</span>؟
+                لا يمكن التراجع عن هذا الإجراء.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={confirmDelete}
+                >
+                  {deleting ? "جار الحذف…" : "حذف"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

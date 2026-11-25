@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router"
 import type { ReactNode } from "react"
+import { Toaster } from "./components/toaster"
 
 import { useAuth } from "./auth/auth-context"
 import { DashboardPage } from "./pages/dashboard-page"
@@ -31,16 +32,19 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login"    element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
-      <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
+    <>
+      <Toaster dir="rtl" />
+      <Routes>
+        <Route path="/login"    element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+        <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
 
-      <Route path="/dashboard"       element={<ProtectedRoutes><DashboardPage /></ProtectedRoutes>} />
-      <Route path="/listings"        element={<ProtectedRoutes><ListingsPage /></ProtectedRoutes>} />
-      <Route path="/listings/create" element={<ProtectedRoutes><CreateListingPage /></ProtectedRoutes>} />
-      <Route path="/locations"       element={<ProtectedRoutes><LocationsPage /></ProtectedRoutes>} />
+        <Route path="/dashboard"       element={<ProtectedRoutes><DashboardPage /></ProtectedRoutes>} />
+        <Route path="/listings"        element={<ProtectedRoutes><ListingsPage /></ProtectedRoutes>} />
+        <Route path="/listings/create" element={<ProtectedRoutes><CreateListingPage /></ProtectedRoutes>} />
+        <Route path="/locations"       element={<ProtectedRoutes><LocationsPage /></ProtectedRoutes>} />
 
-      <Route path="*" element={<Navigate replace to="/dashboard" />} />
-    </Routes>
+        <Route path="*" element={<Navigate replace to="/dashboard" />} />
+      </Routes>
+    </>
   )
 }
