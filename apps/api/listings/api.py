@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Router, Schema
 from ninja.utils import check_csrf
 
-from .models import DEFAULT_EXPIRY_DAYS, Listing
+from .models import DEFAULT_EXPIRY_DAYS, MAX_EXPIRY_DAYS, Listing
 
 router = Router()
 T = TypeVar("T")
@@ -28,6 +28,10 @@ class ListingIn(Schema):
     quantity: Decimal
     unit: Listing.Unit
     description: str = ""
+    duration_days: int = DEFAULT_EXPIRY_DAYS
+
+
+class RenewListingIn(Schema):
     duration_days: int = DEFAULT_EXPIRY_DAYS
 
 
@@ -111,17 +115,19 @@ def list_listings(
         return 401, {"detail": str(_("Authentication required."))}
 
     now = timezone.now()
-    qs = (
-        Listing.objects
-        .select_related("author__locality__state")
-        .filter(is_active=True, expires_at__gt=now)
-    )
+    # Mark expired listings inactive so their status stays accurate.
+    Listing.objects.filter(is_active=True, expires_at__lte=now).update(is_active=False)
+
+    qs = Listing.objects.select_related("author__locality__state")
+    if my_listings:
+        qs = qs.filter(author=request.user)
+    else:
+        qs = qs.filter(is_active=True, expires_at__gt=now)
+
     if listing_type is not None:
         qs = qs.filter(listing_type=listing_type)
     if product_category is not None:
         qs = qs.filter(product_category=product_category)
-    if my_listings:
-        qs = qs.filter(author=request.user)
     return list(qs.order_by("-created_at"))
 
 
@@ -131,7 +137,7 @@ def create_listing(request, payload: ListingIn):
     if not request.user.is_authenticated:
         return 401, {"detail": str(_("Authentication required."))}
 
-    duration = max(1, min(90, payload.duration_days))
+    duration = max(1, min(MAX_EXPIRY_DAYS, payload.duration_days))
     expires_at = timezone.now() + timedelta(days=duration)
 
     listing = Listing.objects.create(
@@ -166,3 +172,25 @@ def delete_listing(request, listing_id: int):
 
     listing.delete()
     return {"detail": str(_("Listing deleted."))}
+
+
+@router.post("/{listing_id}/renew", response={200: ListingOut, 401: MessageOut, 403: MessageOut, 404: MessageOut})
+@csrf_protected
+def renew_listing(request, listing_id: int, payload: RenewListingIn | None = None):
+    if not request.user.is_authenticated:
+        return 401, {"detail": str(_("Authentication required."))}
+
+    try:
+        listing = Listing.objects.select_related("author__locality__state").get(pk=listing_id)
+    except Listing.DoesNotExist:
+        return 404, {"detail": str(_("Listing not found."))}
+
+    if listing.author_id != request.user.pk and not request.user.is_superuser:
+        return 403, {"detail": str(_("You can only renew your own listings."))}
+
+    requested_days = payload.duration_days if payload is not None else DEFAULT_EXPIRY_DAYS
+    duration = max(1, min(MAX_EXPIRY_DAYS, requested_days))
+    listing.is_active = True
+    listing.expires_at = timezone.now() + timedelta(days=duration)
+    listing.save(update_fields=["is_active", "expires_at"])
+    return 200, listing

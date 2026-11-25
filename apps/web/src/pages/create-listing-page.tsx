@@ -41,8 +41,6 @@ const DURATION_OPTIONS = [
   { value: 7, label: "٧ أيام" },
   { value: 14, label: "١٤ يوماً" },
   { value: 30, label: "٣٠ يوماً (افتراضي)" },
-  { value: 60, label: "٦٠ يوماً" },
-  { value: 90, label: "٩٠ يوماً" },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────

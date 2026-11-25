@@ -54,14 +54,6 @@ function timeAgo(iso: string): string {
   return `منذ ${days} أيام`
 }
 
-function daysLeft(iso: string): { text: string; urgent: boolean } {
-  const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
-  if (days <= 0) return { text: "منتهي", urgent: true }
-  if (days === 1) return { text: "ينتهي غداً", urgent: true }
-  if (days <= 3) return { text: `ينتهي خلال ${days} أيام`, urgent: true }
-  return { text: `ينتهي خلال ${days} يوماً`, urgent: false }
-}
-
 function waUrl(phone: string): string {
   return `https://wa.me/${phone.replace(/[^\d]/g, "")}`
 }
@@ -76,16 +68,20 @@ function ListingCard({
   listing,
   currentUserId,
   onDelete,
+  onRenew,
+  renewing,
 }: {
   listing: Listing
   currentUserId: number | undefined
   onDelete: (id: number) => void
+  onRenew: (id: number) => void
+  renewing: boolean
 }) {
   const isOwner = listing.author_id === currentUserId
-  const expiry = daysLeft(listing.expires_at)
+  const isInactive = !listing.is_active || new Date(listing.expires_at).getTime() <= Date.now()
 
   return (
-    <Card>
+    <Card className={isInactive ? "opacity-80" : undefined}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 min-w-0">
@@ -102,6 +98,11 @@ function ListingCard({
               <span className="text-muted-foreground text-xs shrink-0">
                 {CATEGORY_LABELS[listing.product_category] ?? listing.product_category}
               </span>
+              {isOwner && isInactive && (
+                <span className="bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                  غير نشط
+                </span>
+              )}
             </div>
             <CardTitle className="text-base leading-tight">{listing.product_name}</CardTitle>
           </div>
@@ -146,13 +147,20 @@ function ListingCard({
           <span>{timeAgo(listing.created_at)}</span>
         </div>
 
-        {/* Expiry badge */}
-        <p className={`text-xs font-medium ${expiry.urgent ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`}>
-          {expiry.text}
-        </p>
-
-        {/* Contact buttons */}
+        {/* Contact & owner actions */}
         <div className="flex flex-wrap gap-2 pt-1">
+          {isOwner && isInactive && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={renewing}
+              onClick={() => onRenew(listing.id)}
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              <span>{renewing ? "جار التجديد…" : "تجديد الإعلان"}</span>
+            </Button>
+          )}
           {listing.author_allow_whatsapp && listing.author_whatsapp_number && (
             <a
               href={waUrl(listing.author_whatsapp_number)}
@@ -292,6 +300,7 @@ export function ListingsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sortOption, setSortOption] = useState<SortOption>("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [renewingId, setRenewingId] = useState<number | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -369,6 +378,29 @@ export function ListingsPage() {
       setListings((prev) => prev.filter((l) => l.id !== id))
     } catch (err) {
       alert(err instanceof Error ? err.message : "تعذر حذف الإعلان.")
+    }
+  }
+
+  async function handleRenew(id: number) {
+    setRenewingId(id)
+    try {
+      const csrf = await getCsrfToken()
+      const res = await fetch(`/api/listings/${id}/renew`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { detail?: string }
+        throw new Error(body.detail ?? "تعذر تجديد الإعلان.")
+      }
+      const updated = (await res.json()) as Listing
+      setListings((prev) => prev.map((l) => (l.id === id ? updated : l)))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "تعذر تجديد الإعلان.")
+    } finally {
+      setRenewingId(null)
     }
   }
 
@@ -491,6 +523,8 @@ export function ListingsPage() {
                   listing={listing}
                   currentUserId={user?.id}
                   onDelete={handleDelete}
+                  onRenew={handleRenew}
+                  renewing={renewingId === listing.id}
                 />
               ))}
             </div>

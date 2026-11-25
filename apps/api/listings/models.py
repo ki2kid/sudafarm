@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 DEFAULT_EXPIRY_DAYS = 30
+MAX_EXPIRY_DAYS = 30
 
 
 class Listing(models.Model):
