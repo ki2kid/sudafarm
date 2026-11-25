@@ -61,7 +61,8 @@ export function CreateListingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  function handleCategoryChange(value: string) {
+  function handleCategoryChange(value: string | null) {
+    if (!value) return
     setProductCategory(value)
     if (!productName || Object.values(CATEGORY_LABELS).includes(productName)) {
       setProductName(CATEGORY_LABELS[value] ?? "")

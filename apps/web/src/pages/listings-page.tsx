@@ -2,8 +2,8 @@ import { useEffect, useState } from "react"
 import { Link } from "react-router"
 import { MessageCircle, Phone, Trash2 } from "lucide-react"
 
-import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { buttonVariants } from "@workspace/ui/components/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
@@ -165,7 +165,6 @@ function ListingCard({
             >
               <MessageCircle className="size-3.5" aria-hidden="true" />
               <span>واتساب</span>
-              <span className="opacity-80">{formatPhone(listing.author_whatsapp_number)}</span>
             </a>
           )}
           {listing.author_allow_call && listing.author_call_phone && (
@@ -175,7 +174,6 @@ function ListingCard({
             >
               <Phone className="size-3.5" aria-hidden="true" />
               <span>اتصال</span>
-              <span className="text-muted-foreground">{formatPhone(listing.author_call_phone)}</span>
             </a>
           )}
         </div>
@@ -253,9 +251,7 @@ export function ListingsPage() {
             <h1 className="text-2xl font-semibold">الإعلانات</h1>
             <p className="text-muted-foreground text-sm">عروض البيع والشراء من المزارعين والتجار.</p>
           </div>
-          <Button asChild>
-            <Link to="/listings/create">نشر إعلان جديد</Link>
-          </Button>
+          <Link to="/listings/create" className={buttonVariants()}>نشر إعلان جديد</Link>
         </div>
 
         {/* Filters */}
@@ -309,9 +305,7 @@ export function ListingsPage() {
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
               <p className="text-muted-foreground">لا توجد إعلانات مطابقة.</p>
-              <Button asChild variant="outline">
-                <Link to="/listings/create">كن أول من ينشر إعلاناً</Link>
-              </Button>
+              <Link to="/listings/create" className={buttonVariants({ variant: "outline" })}>كن أول من ينشر إعلاناً</Link>
             </CardContent>
           </Card>
         )}
