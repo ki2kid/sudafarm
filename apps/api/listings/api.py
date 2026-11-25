@@ -8,6 +8,8 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Router, Schema
 from ninja.utils import check_csrf
 
+from accounts.models import User
+
 from .models import DEFAULT_EXPIRY_DAYS, MAX_EXPIRY_DAYS, Listing
 
 router = Router()
@@ -109,6 +111,7 @@ def list_listings(
     request,
     listing_type: Listing.ListingType | None = None,
     product_category: Listing.ProductCategory | None = None,
+    author_account_type: User.AccountType | None = None,
     my_listings: bool = False,
 ):
     if not request.user.is_authenticated:
@@ -123,6 +126,8 @@ def list_listings(
         qs = qs.filter(author=request.user)
     else:
         qs = qs.filter(is_active=True, expires_at__gt=now)
+        if author_account_type is not None:
+            qs = qs.filter(author__account_type=author_account_type)
 
     if listing_type is not None:
         qs = qs.filter(listing_type=listing_type)

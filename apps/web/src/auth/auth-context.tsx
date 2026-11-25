@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import type { FormEvent, ReactNode } from "react"
 
+import { toast } from "../components/toaster"
+
 export type AccountType = "farmer" | "trader"
 
 export type User = {
@@ -101,9 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error(await readError(response, "بيانات الدخول غير صحيحة."))
       }
-      setUser((await response.json()) as User)
+      const loggedInUser = (await response.json()) as User
+      setUser(loggedInUser)
+      toast.success(`مرحباً بك، ${loggedInUser.arabic_full_name}!`)
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "تعذر تسجيل الدخول.")
+      const message = loginError instanceof Error ? loginError.message : "تعذر تسجيل الدخول."
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -123,10 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error(await readError(response, "تعذر إنشاء الحساب."))
       }
-      setUser((await response.json()) as User)
+      const createdUser = (await response.json()) as User
+      setUser(createdUser)
+      toast.success(`تم إنشاء حسابك بنجاح، أهلاً بك يا ${createdUser.arabic_full_name}!`)
       return true
     } catch (registerError) {
-      setError(registerError instanceof Error ? registerError.message : "تعذر إنشاء الحساب.")
+      const message = registerError instanceof Error ? registerError.message : "تعذر إنشاء الحساب."
+      setError(message)
+      toast.error(message)
       return false
     } finally {
       setSubmitting(false)
@@ -147,8 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(await readError(response, "تعذر تسجيل الخروج."))
       }
       setUser(null)
+      toast.success("تم تسجيل الخروج بنجاح.")
     } catch (logoutError) {
-      setError(logoutError instanceof Error ? logoutError.message : "تعذر تسجيل الخروج.")
+      const message = logoutError instanceof Error ? logoutError.message : "تعذر تسجيل الخروج."
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }

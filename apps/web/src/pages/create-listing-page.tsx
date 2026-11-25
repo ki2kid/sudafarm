@@ -10,6 +10,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 
 import { Navbar } from "../components/navbar"
+import { toast } from "../components/toaster"
 import { getCsrfToken } from "../lib/api"
 
 // ── Arabic label maps ─────────────────────────────────────────────────────────
@@ -98,9 +99,12 @@ export function CreateListingPage() {
         const body = (await response.json().catch(() => ({}))) as { detail?: string }
         throw new Error(body.detail ?? "تعذر نشر الإعلان.")
       }
+      toast.success("تم نشر إعلانك بنجاح!")
       navigate("/listings")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر نشر الإعلان.")
+      const message = err instanceof Error ? err.message : "تعذر نشر الإعلان."
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }

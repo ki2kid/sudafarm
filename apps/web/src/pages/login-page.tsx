@@ -8,6 +8,7 @@ import { Label } from "@workspace/ui/components/label"
 
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
+import { toast } from "../components/toaster"
 
 const DEMO_ACCOUNTS = [
   { label: "مزارع (واتساب + مكالمات)", username: "farmer1", phone: "+249911111111" },
@@ -24,6 +25,7 @@ export function LoginPage() {
   function fillDemoAccount(username: string) {
     setIdentifier(username)
     setPassword("demo1234")
+    toast(`تم تعبئة بيانات الحساب التجريبي (${username})`)
   }
 
   return (

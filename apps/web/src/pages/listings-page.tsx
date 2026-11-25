@@ -41,6 +41,7 @@ type Listing = {
 }
 
 type Filter = "all" | "sell" | "buy" | "mine"
+type AuthorTypeFilter = "all" | "farmer" | "trader"
 type SortOption = "newest" | "oldest" | "price_asc" | "price_desc"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -68,18 +69,20 @@ function formatPrice(price: string, unit: Unit): string {
 function ListingCard({
   listing,
   currentUserId,
+  now,
   onDelete,
   onRenew,
   renewing,
 }: {
   listing: Listing
   currentUserId: number | undefined
+  now: number
   onDelete: (id: number) => void
   onRenew: (id: number) => void
   renewing: boolean
 }) {
   const isOwner = listing.author_id === currentUserId
-  const isInactive = !listing.is_active || new Date(listing.expires_at).getTime() <= Date.now()
+  const isInactive = !listing.is_active || new Date(listing.expires_at).getTime() <= now
 
   return (
     <Card className={isInactive ? "opacity-80" : undefined}>
@@ -88,11 +91,10 @@ function ListingCard({
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  listing.listing_type === "sell"
+                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${listing.listing_type === "sell"
                     ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
                     : "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                }`}
+                  }`}
               >
                 {listing.listing_type === "sell" ? "بيع" : "شراء"}
               </span>
@@ -197,6 +199,12 @@ const FILTER_TABS: { value: Filter; label: string }[] = [
   { value: "mine", label: "إعلاناتي" },
 ]
 
+const AUTHOR_TYPE_TABS: { value: AuthorTypeFilter; label: string }[] = [
+  { value: "all", label: "الكل" },
+  { value: "farmer", label: "المزارعون" },
+  { value: "trader", label: "التجار" },
+]
+
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest", label: "الأحدث" },
   { value: "oldest", label: "الأقدم" },
@@ -212,6 +220,8 @@ const CATEGORY_FILTER_OPTIONS = [
 function FiltersContent({
   filter,
   onFilterChange,
+  authorTypeFilter,
+  onAuthorTypeChange,
   categoryFilter,
   onCategoryChange,
   sortOption,
@@ -219,6 +229,8 @@ function FiltersContent({
 }: {
   filter: Filter
   onFilterChange: (value: Filter) => void
+  authorTypeFilter: AuthorTypeFilter
+  onAuthorTypeChange: (value: AuthorTypeFilter) => void
   categoryFilter: string
   onCategoryChange: (value: string) => void
   sortOption: SortOption
@@ -226,6 +238,28 @@ function FiltersContent({
 }) {
   return (
     <div className="space-y-5">
+      {/* Author account type filter */}
+      {filter !== "mine" && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground">إعلانات</h3>
+          <div className="grid grid-cols-3 gap-1.5">
+            {AUTHOR_TYPE_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => onAuthorTypeChange(tab.value)}
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${authorTypeFilter === tab.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Type tabs */}
       <div className="space-y-2">
         <h3 className="text-xs font-semibold text-muted-foreground">نوع الإعلان</h3>
@@ -235,11 +269,10 @@ function FiltersContent({
               key={tab.value}
               type="button"
               onClick={() => onFilterChange(tab.value)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                filter === tab.value
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${filter === tab.value
                   ? "bg-primary text-primary-foreground border-primary"
                   : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -259,11 +292,10 @@ function FiltersContent({
               key={opt.value}
               type="button"
               onClick={() => onSortChange(opt.value)}
-              className={`w-full rounded-lg border px-3 py-1.5 text-start text-xs font-medium transition-colors ${
-                sortOption === opt.value
+              className={`w-full rounded-lg border px-3 py-1.5 text-start text-xs font-medium transition-colors ${sortOption === opt.value
                   ? "bg-primary/10 text-primary border-primary/40 font-semibold"
                   : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
+                }`}
             >
               {opt.label}
             </button>
@@ -280,11 +312,10 @@ function FiltersContent({
               key={opt.value}
               type="button"
               onClick={() => onCategoryChange(opt.value)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                categoryFilter === opt.value
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${categoryFilter === opt.value
                   ? "bg-secondary text-secondary-foreground border-secondary"
                   : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
+                }`}
             >
               {opt.label}
             </button>
@@ -297,26 +328,38 @@ function FiltersContent({
 
 export function ListingsPage() {
   const { user } = useAuth()
+  const defaultAuthorTypeFilter: AuthorTypeFilter =
+    user?.account_type === "farmer"
+      ? "trader"
+      : user?.account_type === "trader"
+        ? "farmer"
+        : "all"
+
   const [filter, setFilter] = useState<Filter>("all")
+  const [authorTypeFilter, setAuthorTypeFilter] = useState<AuthorTypeFilter>(defaultAuthorTypeFilter)
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sortOption, setSortOption] = useState<SortOption>("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [renewingId, setRenewingId] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   const activeFilterCount =
     (filter !== "all" ? 1 : 0) +
+    (filter !== "mine" && authorTypeFilter !== defaultAuthorTypeFilter ? 1 : 0) +
     (categoryFilter !== "all" ? 1 : 0) +
     (sortOption !== "newest" ? 1 : 0)
 
   function resetFilters() {
     setFilter("all")
+    setAuthorTypeFilter(defaultAuthorTypeFilter)
     setCategoryFilter("all")
     setSortOption("newest")
+    toast("تمت إعادة تعيين الفلاتر.")
   }
 
   useEffect(() => {
@@ -336,6 +379,9 @@ export function ListingsPage() {
     if (filter === "sell") params.set("listing_type", "sell")
     else if (filter === "buy") params.set("listing_type", "buy")
     else if (filter === "mine") params.set("my_listings", "true")
+    if (filter !== "mine" && authorTypeFilter !== "all") {
+      params.set("author_account_type", authorTypeFilter)
+    }
     if (categoryFilter !== "all") params.set("product_category", categoryFilter)
 
     async function load() {
@@ -344,6 +390,7 @@ export function ListingsPage() {
       try {
         const res = await fetch(`/api/listings?${params.toString()}`, { credentials: "same-origin" })
         if (!res.ok) throw new Error("تعذر تحميل الإعلانات.")
+        setNow(Date.now())
         setListings((await res.json()) as Listing[])
       } catch (err) {
         setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات.")
@@ -352,7 +399,7 @@ export function ListingsPage() {
       }
     }
     void load()
-  }, [filter, categoryFilter])
+  }, [filter, authorTypeFilter, categoryFilter])
 
   const sortedListings = useMemo(() => {
     const copy = [...listings]
@@ -413,6 +460,7 @@ export function ListingsPage() {
         throw new Error(body.detail ?? "تعذر تجديد الإعلان.")
       }
       const updated = (await res.json()) as Listing
+      setNow(Date.now())
       setListings((prev) => prev.map((l) => (l.id === id ? updated : l)))
       toast.success("تم تجديد الإعلان بنجاح.")
     } catch (err) {
@@ -498,6 +546,8 @@ export function ListingsPage() {
                 <FiltersContent
                   filter={filter}
                   onFilterChange={setFilter}
+                  authorTypeFilter={authorTypeFilter}
+                  onAuthorTypeChange={setAuthorTypeFilter}
                   categoryFilter={categoryFilter}
                   onCategoryChange={setCategoryFilter}
                   sortOption={sortOption}
@@ -526,9 +576,6 @@ export function ListingsPage() {
                         إعادة تعيين الفلاتر
                       </Button>
                     )}
-                    <Link to="/listings/create" className={buttonVariants({ variant: "outline" })}>
-                      كن أول من ينشر إعلاناً
-                    </Link>
                   </div>
                 </CardContent>
               </Card>
@@ -540,6 +587,7 @@ export function ListingsPage() {
                   key={listing.id}
                   listing={listing}
                   currentUserId={user?.id}
+                  now={now}
                   onDelete={requestDelete}
                   onRenew={handleRenew}
                   renewing={renewingId === listing.id}
@@ -582,6 +630,8 @@ export function ListingsPage() {
               <FiltersContent
                 filter={filter}
                 onFilterChange={setFilter}
+                authorTypeFilter={authorTypeFilter}
+                onAuthorTypeChange={setAuthorTypeFilter}
                 categoryFilter={categoryFilter}
                 onCategoryChange={setCategoryFilter}
                 sortOption={sortOption}
