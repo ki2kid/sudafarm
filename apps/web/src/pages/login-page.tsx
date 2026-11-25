@@ -16,7 +16,7 @@ export function LoginPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle>تسجيل الدخول</CardTitle>
-            <CardDescription>سجّل الدخول إلى منصة إسناد لإدارة عمليات المستشفى.</CardDescription>
+            <CardDescription>سجّل الدخول إلى منصة سودافارم.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={login}>

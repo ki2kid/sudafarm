@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_DB: isnadho
-      POSTGRES_USER: isnadho
+      POSTGRES_DB: sudafarm
+      POSTGRES_USER: sudafarm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U isnadho -d isnadho" ]
+      test: [ "CMD-SHELL", "pg_isready -U sudafarm -d sudafarm" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -19,7 +19,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "False"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
-      DATABASE_URL: postgres://isnadho:${POSTGRES_PASSWORD}@db:5432/isnadho
+      DATABASE_URL: postgres://sudafarm:${POSTGRES_PASSWORD}@db:5432/sudafarm
       CORS_ALLOWED_ORIGINS: http://localhost:3000
     depends_on:
       db:

@@ -1,4 +1,4 @@
-# ISNADHO
+# SudaFarm
 
 Turborepo monorepo (pnpm). Frontend: apps/web (Vite, React, shadcn/ui, Tailwind).
 Backend: apps/api (Django + django-ninja, uv). Docker Compose at the root.
