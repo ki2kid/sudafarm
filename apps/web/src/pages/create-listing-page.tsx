@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { Navbar } from "../components/navbar"
 import { toast } from "../components/toaster"
-import { getCsrfToken } from "../lib/api"
+import { getCsrfToken, formatErrorMessage } from "../lib/api"
 import { addPendingListing } from "../lib/offline-store"
 
 // ── Arabic label maps ─────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export function CreateListingPage() {
         navigate("/listings")
         return
       }
-      const message = err instanceof Error ? err.message : "تعذر نشر الإعلان."
+      const message = formatErrorMessage(err, "تعذر نشر الإعلان.")
       setError(message)
       toast.error(message)
     } finally {

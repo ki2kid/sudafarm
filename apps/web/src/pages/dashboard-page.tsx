@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 import { useAuth } from "../auth/auth-context"
 import type { AccountType } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
+import { RetryError } from "../components/retry-error"
+import { formatErrorMessage } from "../lib/api"
 import { getCachedDirectory, setCachedDirectory } from "../lib/offline-store"
 
 type DirectoryAccount = {
@@ -48,6 +50,7 @@ export function DashboardPage() {
   const [accounts, setAccounts] = useState<DirectoryAccount[]>(() => getLocalDirectory(initialFilter))
   const [loadingDirectory, setLoadingDirectory] = useState(() => getLocalDirectory(initialFilter).length === 0)
   const [directoryError, setDirectoryError] = useState("")
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
     const query = filter === "all" ? "" : `?account_type=${filter}`
@@ -77,14 +80,14 @@ export function DashboardPage() {
         if (initialCached.length > 0) {
           setAccounts(initialCached)
         } else {
-          setDirectoryError(loadError instanceof Error ? loadError.message : "تعذر تحميل دليل الحسابات.")
+          setDirectoryError(formatErrorMessage(loadError, "تعذر تحميل دليل الحسابات."))
         }
       } finally {
         setLoadingDirectory(false)
       }
     }
     void load()
-  }, [filter])
+  }, [filter, retryTick])
 
   return (
     <div className="bg-muted/30 min-h-svh" dir="rtl">
@@ -168,7 +171,14 @@ export function DashboardPage() {
             <p className="text-muted-foreground text-sm" role="status">جار تحميل الحسابات…</p>
           )}
           {directoryError && (
-            <p className="text-destructive text-sm" role="alert">{directoryError}</p>
+            <RetryError
+              message={directoryError}
+              retrying={loadingDirectory}
+              onRetry={() => {
+                setLoadingDirectory(true)
+                setRetryTick((t) => t + 1)
+              }}
+            />
           )}
 
           {!loadingDirectory && accounts.length === 0 && (

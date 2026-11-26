@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import type { FormEvent, ReactNode } from "react"
 
 import { toast } from "../components/toaster"
+import { formatErrorMessage } from "../lib/api"
 import {
   clearAllOfflineCaches,
   getCachedUser,
@@ -133,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCachedUser(loggedInUser)
       toast.success(`مرحباً بك، ${loggedInUser.arabic_full_name}!`)
     } catch (loginError) {
-      const message = loginError instanceof Error ? loginError.message : "تعذر تسجيل الدخول."
+      const message = formatErrorMessage(loginError, "تعذر تسجيل الدخول.")
       setError(message)
       toast.error(message)
     } finally {
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success(`تم إنشاء حسابك بنجاح، أهلاً بك يا ${createdUser.arabic_full_name}!`)
       return true
     } catch (registerError) {
-      const message = registerError instanceof Error ? registerError.message : "تعذر إنشاء الحساب."
+      const message = formatErrorMessage(registerError, "تعذر إنشاء الحساب.")
       setError(message)
       toast.error(message)
       return false
@@ -190,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success("تم تحديث الملف الشخصي بنجاح.")
       return true
     } catch (updateError) {
-      const message = updateError instanceof Error ? updateError.message : "تعذر تحديث الملف الشخصي."
+      const message = formatErrorMessage(updateError, "تعذر تحديث الملف الشخصي.")
       setError(message)
       toast.error(message)
       return false
@@ -219,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       toast.success("تم تسجيل الخروج بنجاح.")
     } catch (logoutError) {
-      const message = logoutError instanceof Error ? logoutError.message : "تعذر تسجيل الخروج."
+      const message = formatErrorMessage(logoutError, "تعذر تسجيل الخروج.")
       setError(message)
       toast.error(message)
     } finally {

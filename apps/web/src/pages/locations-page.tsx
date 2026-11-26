@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
+import { RetryError } from "../components/retry-error"
+import { formatErrorMessage } from "../lib/api"
 
 type State = { id: number; name_ar: string; name_en: string; code: string }
 type Locality = { id: number; state_id: number; name_ar: string; name_en: string }
@@ -26,6 +28,7 @@ export function LocationsPage() {
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(true)
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -38,9 +41,9 @@ export function LocationsPage() {
         setLocalities(nextLocalities)
         setNeighborhoods(nextNeighborhoods)
       })
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "تعذر تحميل البيانات."))
+      .catch((loadError) => setError(formatErrorMessage(loadError, "تعذر تحميل البيانات.")))
       .finally(() => setLoading(false))
-  }, [])
+  }, [retryTick])
 
   if (!user?.is_superuser) {
     return (
@@ -62,7 +65,17 @@ export function LocationsPage() {
           <p className="text-muted-foreground text-sm">عرض التقسيمات الجغرافية المعتمدة.</p>
         </header>
         {loading && <p role="status">جار تحميل البيانات…</p>}
-        {error && <p className="text-destructive text-sm" role="alert">{error}</p>}
+        {error && (
+          <RetryError
+            message={error}
+            retrying={loading}
+            onRetry={() => {
+              setError("")
+              setLoading(true)
+              setRetryTick((t) => t + 1)
+            }}
+          />
+        )}
 
         <Card>
           <CardHeader><CardTitle>التقسيمات الجغرافية</CardTitle><CardDescription>البيانات المرجعية للمناطق والمحليات والأحياء.</CardDescription></CardHeader>

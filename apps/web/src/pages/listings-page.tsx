@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
-import { getCsrfToken } from "../lib/api"
+import { RetryError } from "../components/retry-error"
+import { formatErrorMessage, getCsrfToken } from "../lib/api"
 import {
   SYNC_COMPLETE_EVENT,
   getCachedListings,
@@ -410,6 +411,7 @@ export function ListingsPage() {
   }, [mobileFiltersOpen, deleteTarget, deleting, editTarget, savingEdit])
 
   const [pendingListings, setPendingListings] = useState<PendingListing[]>(() => getPendingListings())
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -462,7 +464,7 @@ export function ListingsPage() {
         if (initialCached.length > 0) {
           setListings(initialCached)
         } else {
-          setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات.")
+          setError(formatErrorMessage(err, "تعذر تحميل الإعلانات."))
         }
       } finally {
         setLoading(false)
@@ -477,7 +479,7 @@ export function ListingsPage() {
 
     window.addEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete)
     return () => window.removeEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete)
-  }, [filter, authorTypeFilter, categoryFilter, user?.id])
+  }, [filter, authorTypeFilter, categoryFilter, user?.id, retryTick])
 
   const visiblePendingListings = useMemo(() => {
     return pendingListings.filter((item) => {
@@ -561,7 +563,7 @@ export function ListingsPage() {
       setEditTarget(null)
       toast.success("تم تحديث الإعلان بنجاح.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "تعذر تحديث الإعلان.")
+      toast.error(formatErrorMessage(err, "تعذر تحديث الإعلان."))
     } finally {
       setSavingEdit(false)
     }
@@ -591,7 +593,7 @@ export function ListingsPage() {
       setDeleteTarget(null)
       toast.success("تم حذف الإعلان.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "تعذر حذف الإعلان.")
+      toast.error(formatErrorMessage(err, "تعذر حذف الإعلان."))
     } finally {
       setDeleting(false)
     }
@@ -616,7 +618,7 @@ export function ListingsPage() {
       setListings((prev) => prev.map((l) => (l.id === id ? updated : l)))
       toast.success("تم تجديد الإعلان بنجاح.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "تعذر تجديد الإعلان.")
+      toast.error(formatErrorMessage(err, "تعذر تجديد الإعلان."))
     } finally {
       setRenewingId(null)
     }
@@ -715,7 +717,14 @@ export function ListingsPage() {
               <p className="text-muted-foreground text-sm" role="status">جار تحميل الإعلانات…</p>
             )}
             {error && (
-              <p className="text-destructive text-sm" role="alert">{error}</p>
+              <RetryError
+                message={error}
+                retrying={loading}
+                onRetry={() => {
+                  setLoading(true)
+                  setRetryTick((t) => t + 1)
+                }}
+              />
             )}
 
             {!loading && !error && listings.length === 0 && visiblePendingListings.length === 0 && (
