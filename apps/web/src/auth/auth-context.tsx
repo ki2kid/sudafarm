@@ -195,6 +195,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error(await readError(response, "تعذر تسجيل الخروج."))
       }
+      if ("caches" in window) {
+        await caches.delete("api-data-cache").catch(() => undefined)
+      }
       setUser(null)
       toast.success("تم تسجيل الخروج بنجاح.")
     } catch (logoutError) {

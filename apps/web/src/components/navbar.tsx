@@ -1,14 +1,16 @@
-import { LayoutList, LogOut, Moon, Plus, Sun, UserCog } from "lucide-react"
+import { Download, LayoutList, LogOut, Moon, Plus, Sun, UserCog } from "lucide-react"
 import { Link } from "react-router"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { useAuth } from "../auth/auth-context"
+import { usePwaInstall } from "./pwa-status"
 import { useTheme } from "./theme-provider"
 
 export function Navbar() {
   const { user, logout, submitting } = useAuth()
+  const { canInstall, promptInstall } = usePwaInstall()
   const { setTheme, theme } = useTheme()
   const isDark =
     theme === "dark" ||
@@ -104,6 +106,21 @@ export function Navbar() {
                 <LogOut className="size-4" aria-hidden="true" />
               </Button>
             </>
+          )}
+
+          {/* Install PWA */}
+          {canInstall && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={promptInstall}
+              className="gap-1.5"
+              title="تثبيت التطبيق"
+              aria-label="تثبيت التطبيق"
+            >
+              <Download className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">تثبيت</span>
+            </Button>
           )}
 
           {/* Theme toggle */}

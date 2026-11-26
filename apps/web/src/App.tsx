@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router"
 import type { ReactNode } from "react"
 import { Toaster } from "./components/toaster"
+import { PwaStatus } from "./components/pwa-status"
 
 import { useAuth } from "./auth/auth-context"
 import { DashboardPage } from "./pages/dashboard-page"
@@ -34,6 +35,7 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
 export function App() {
   return (
     <>
+      <PwaStatus />
       <Toaster dir="rtl" />
       <Routes>
         <Route path="/login"    element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
