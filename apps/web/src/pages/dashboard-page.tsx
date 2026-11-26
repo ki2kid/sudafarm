@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 import { useAuth } from "../auth/auth-context"
 import type { AccountType } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
+import { getCachedDirectory, setCachedDirectory } from "../lib/offline-store"
 
 type DirectoryAccount = {
   id: number
@@ -33,26 +34,51 @@ function accountTypeLabel(type: AccountType) {
   return type === "farmer" ? "مزارع" : "تاجر"
 }
 
+function getLocalDirectory(filter: "all" | AccountType): DirectoryAccount[] {
+  const cachedExact = getCachedDirectory<DirectoryAccount>(filter)
+  if (cachedExact.length > 0) return cachedExact
+  const cachedAll = getCachedDirectory<DirectoryAccount>("all")
+  return filter === "all" ? cachedAll : cachedAll.filter((acc) => acc.account_type === filter)
+}
+
 export function DashboardPage() {
   const { user } = useAuth()
-  const [accounts, setAccounts] = useState<DirectoryAccount[]>([])
-  const [filter, setFilter] = useState<"all" | AccountType>(
-    user?.account_type === "farmer" ? "trader" : "farmer",
-  )
-  const [loadingDirectory, setLoadingDirectory] = useState(true)
+  const initialFilter: "all" | AccountType = user?.account_type === "farmer" ? "trader" : "farmer"
+  const [filter, setFilter] = useState<"all" | AccountType>(initialFilter)
+  const [accounts, setAccounts] = useState<DirectoryAccount[]>(() => getLocalDirectory(initialFilter))
+  const [loadingDirectory, setLoadingDirectory] = useState(() => getLocalDirectory(initialFilter).length === 0)
   const [directoryError, setDirectoryError] = useState("")
 
   useEffect(() => {
     const query = filter === "all" ? "" : `?account_type=${filter}`
+    const initialCached = getLocalDirectory(filter)
+
     async function load() {
-      setLoadingDirectory(true)
+      if (initialCached.length === 0) {
+        setLoadingDirectory(true)
+      }
       setDirectoryError("")
       try {
         const response = await fetch(`/api/auth/directory${query}`, { credentials: "same-origin" })
         if (!response.ok) throw new Error("تعذر تحميل دليل الحسابات.")
-        setAccounts((await response.json()) as DirectoryAccount[])
+        const data = (await response.json()) as DirectoryAccount[]
+        setAccounts(data)
+        setCachedDirectory(filter, data)
+
+        if (filter !== "all" && getCachedDirectory<DirectoryAccount>("all").length === 0) {
+          fetch("/api/auth/directory", { credentials: "same-origin" })
+            .then((r) => (r.ok ? (r.json() as Promise<DirectoryAccount[]>) : null))
+            .then((allData) => {
+              if (allData) setCachedDirectory("all", allData)
+            })
+            .catch(() => undefined)
+        }
       } catch (loadError) {
-        setDirectoryError(loadError instanceof Error ? loadError.message : "تعذر تحميل دليل الحسابات.")
+        if (initialCached.length > 0) {
+          setAccounts(initialCached)
+        } else {
+          setDirectoryError(loadError instanceof Error ? loadError.message : "تعذر تحميل دليل الحسابات.")
+        }
       } finally {
         setLoadingDirectory(false)
       }

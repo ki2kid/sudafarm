@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { WifiOff } from "lucide-react"
 import { useRegisterSW } from "virtual:pwa-register/react"
 
+import { getPendingListings, syncPendingListings } from "../lib/offline-store"
 import { toast } from "./toaster"
 
 type BeforeInstallPromptEvent = Event & {
@@ -43,11 +44,12 @@ export function usePwaInstall() {
   return { canInstall: installPrompt !== null, promptInstall }
 }
 
-/** Registers the service worker and displays an offline indicator banner. */
+/** Registers the service worker, syncs pending listings, and displays an offline indicator banner. */
 export function PwaStatus() {
   const [isOffline, setIsOffline] = useState(() =>
     typeof navigator !== "undefined" ? !navigator.onLine : false,
   )
+  const [pendingCount, setPendingCount] = useState(() => getPendingListings().length)
   const wasOfflineRef = useRef(isOffline)
 
   useRegisterSW({
@@ -65,17 +67,31 @@ export function PwaStatus() {
   })
 
   useEffect(() => {
+    async function runSync() {
+      const result = await syncPendingListings()
+      setPendingCount(result.remaining)
+      if (result.synced > 0) {
+        toast.success(`تم نشر ${result.synced} ${result.synced === 1 ? "إعلان محفوظ" : "إعلانات محفوظة"} تلقائياً.`)
+      }
+    }
+
+    if (navigator.onLine) {
+      void runSync()
+    }
+
     function handleOnline() {
       setIsOffline(false)
       if (wasOfflineRef.current) {
         toast.success("تم استعادة الاتصال بالإنترنت.")
       }
       wasOfflineRef.current = false
+      void runSync()
     }
 
     function handleOffline() {
       setIsOffline(true)
       wasOfflineRef.current = true
+      setPendingCount(getPendingListings().length)
     }
 
     window.addEventListener("online", handleOnline)
@@ -95,7 +111,10 @@ export function PwaStatus() {
       className="bg-amber-600 text-white px-4 py-2 text-center text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
     >
       <WifiOff className="size-4 shrink-0" aria-hidden="true" />
-      <span>أنت غير متصل بالإنترنت — يتم عرض البيانات المحفوظة محلياً</span>
+      <span>
+        أنت غير متصل بالإنترنت — يتم عرض البيانات المحفوظة محلياً
+        {pendingCount > 0 ? ` (${pendingCount} بانتظار النشر)` : ""}
+      </span>
     </div>
   )
 }

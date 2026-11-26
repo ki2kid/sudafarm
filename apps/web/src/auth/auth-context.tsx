@@ -2,6 +2,11 @@ import { createContext, useContext, useEffect, useState } from "react"
 import type { FormEvent, ReactNode } from "react"
 
 import { toast } from "../components/toaster"
+import {
+  clearAllOfflineCaches,
+  getCachedUser,
+  setCachedUser,
+} from "../lib/offline-store"
 
 export type AccountType = "farmer" | "trader"
 
@@ -78,8 +83,8 @@ async function getCsrfToken() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(() => getCachedUser())
+  const [loading, setLoading] = useState(() => getCachedUser() === null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
@@ -87,10 +92,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch("/api/auth/me", { credentials: "same-origin" })
       .then(async (response) => {
         if (response.ok) {
-          setUser((await response.json()) as User)
+          const freshUser = (await response.json()) as User
+          setUser(freshUser)
+          setCachedUser(freshUser)
+        } else if (response.status === 401 || response.status === 403) {
+          setUser(null)
+          setCachedUser(null)
         }
       })
-      .catch(() => setError("تعذر الاتصال بالخادم."))
+      .catch(() => {
+        if (!getCachedUser()) {
+          setError("تعذر الاتصال بالخادم.")
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -116,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const loggedInUser = (await response.json()) as User
       setUser(loggedInUser)
+      setCachedUser(loggedInUser)
       toast.success(`مرحباً بك، ${loggedInUser.arabic_full_name}!`)
     } catch (loginError) {
       const message = loginError instanceof Error ? loginError.message : "تعذر تسجيل الدخول."
@@ -142,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const createdUser = (await response.json()) as User
       setUser(createdUser)
+      setCachedUser(createdUser)
       toast.success(`تم إنشاء حسابك بنجاح، أهلاً بك يا ${createdUser.arabic_full_name}!`)
       return true
     } catch (registerError) {
@@ -170,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const updatedUser = (await response.json()) as User
       setUser(updatedUser)
+      setCachedUser(updatedUser)
       toast.success("تم تحديث الملف الشخصي بنجاح.")
       return true
     } catch (updateError) {
@@ -198,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ("caches" in window) {
         await caches.delete("api-data-cache").catch(() => undefined)
       }
+      clearAllOfflineCaches()
       setUser(null)
       toast.success("تم تسجيل الخروج بنجاح.")
     } catch (logoutError) {

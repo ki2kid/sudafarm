@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Navbar } from "../components/navbar"
 import { toast } from "../components/toaster"
 import { getCsrfToken } from "../lib/api"
+import { addPendingListing } from "../lib/offline-store"
 
 // ── Arabic label maps ─────────────────────────────────────────────────────────
 
@@ -77,6 +78,24 @@ export function CreateListingPage() {
     if (Number(price) <= 0) { setError("يرجى إدخال سعر صحيح."); return }
     if (Number(quantity) <= 0) { setError("يرجى إدخال كمية صحيحة."); return }
 
+    const payload = {
+      listing_type: listingType,
+      product_category: productCategory,
+      product_name: productName.trim(),
+      price: Number(price),
+      quantity: Number(quantity),
+      unit,
+      description: description.trim(),
+      duration_days: durationDays,
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      addPendingListing(payload)
+      toast.success("تم حفظ الإعلان محلياً وسيتم نشره تلقائياً عند عودة الاتصال.")
+      navigate("/listings")
+      return
+    }
+
     setSubmitting(true)
     try {
       const csrf = await getCsrfToken()
@@ -84,16 +103,7 @@ export function CreateListingPage() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-        body: JSON.stringify({
-          listing_type: listingType,
-          product_category: productCategory,
-          product_name: productName.trim(),
-          price: Number(price),
-          quantity: Number(quantity),
-          unit,
-          description: description.trim(),
-          duration_days: durationDays,
-        }),
+        body: JSON.stringify(payload),
       })
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { detail?: string }
@@ -102,6 +112,14 @@ export function CreateListingPage() {
       toast.success("تم نشر إعلانك بنجاح!")
       navigate("/listings")
     } catch (err) {
+      const isNetworkFailure =
+        (typeof navigator !== "undefined" && !navigator.onLine) || err instanceof TypeError
+      if (isNetworkFailure) {
+        addPendingListing(payload)
+        toast.success("تعذر الاتصال الآن — تم حفظ الإعلان محلياً وسيُنشر تلقائياً عند عودة الشبكة.")
+        navigate("/listings")
+        return
+      }
       const message = err instanceof Error ? err.message : "تعذر نشر الإعلان."
       setError(message)
       toast.error(message)

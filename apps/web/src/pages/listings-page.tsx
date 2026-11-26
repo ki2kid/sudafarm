@@ -13,6 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "../auth/auth-context"
 import { Navbar } from "../components/navbar"
 import { getCsrfToken } from "../lib/api"
+import {
+  SYNC_COMPLETE_EVENT,
+  getCachedListings,
+  getPendingListings,
+  removePendingListing,
+  setCachedListings,
+  type PendingListing,
+} from "../lib/offline-store"
 import { CATEGORY_LABELS, UNIT_LABELS } from "./create-listing-page"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -401,6 +409,8 @@ export function ListingsPage() {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [mobileFiltersOpen, deleteTarget, deleting, editTarget, savingEdit])
 
+  const [pendingListings, setPendingListings] = useState<PendingListing[]>(() => getPendingListings())
+
   useEffect(() => {
     const params = new URLSearchParams()
     if (filter === "sell") params.set("listing_type", "sell")
@@ -411,22 +421,78 @@ export function ListingsPage() {
     }
     if (categoryFilter !== "all") params.set("product_category", categoryFilter)
 
+    const cacheKey = params.toString() || "all"
+    const cachedExact = getCachedListings<Listing>(cacheKey)
+    const cachedAll = getCachedListings<Listing>("all")
+    const initialCached =
+      cachedExact.length > 0
+        ? cachedExact
+        : cachedAll.filter((item) => {
+            if (filter === "sell" && item.listing_type !== "sell") return false
+            if (filter === "buy" && item.listing_type !== "buy") return false
+            if (filter === "mine" && item.author_id !== user?.id) return false
+            if (filter !== "mine" && authorTypeFilter !== "all" && item.author_account_type !== authorTypeFilter)
+              return false
+            if (categoryFilter !== "all" && item.product_category !== categoryFilter) return false
+            return true
+          })
+
     async function load() {
-      setLoading(true)
+      if (initialCached.length === 0) {
+        setLoading(true)
+      }
       setError("")
       try {
         const res = await fetch(`/api/listings?${params.toString()}`, { credentials: "same-origin" })
         if (!res.ok) throw new Error("تعذر تحميل الإعلانات.")
         setNow(Date.now())
-        setListings((await res.json()) as Listing[])
+        const data = (await res.json()) as Listing[]
+        setListings(data)
+        setCachedListings(cacheKey, data)
+
+        if (cacheKey !== "all" && getCachedListings<Listing>("all").length === 0) {
+          fetch("/api/listings", { credentials: "same-origin" })
+            .then((r) => (r.ok ? (r.json() as Promise<Listing[]>) : null))
+            .then((allData) => {
+              if (allData) setCachedListings("all", allData)
+            })
+            .catch(() => undefined)
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات.")
+        if (initialCached.length > 0) {
+          setListings(initialCached)
+        } else {
+          setError(err instanceof Error ? err.message : "تعذر تحميل الإعلانات.")
+        }
       } finally {
         setLoading(false)
       }
     }
     void load()
-  }, [filter, authorTypeFilter, categoryFilter])
+
+    function handleSyncComplete() {
+      setPendingListings(getPendingListings())
+      void load()
+    }
+
+    window.addEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete)
+    return () => window.removeEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete)
+  }, [filter, authorTypeFilter, categoryFilter, user?.id])
+
+  const visiblePendingListings = useMemo(() => {
+    return pendingListings.filter((item) => {
+      if (filter === "sell" && item.listing_type !== "sell") return false
+      if (filter === "buy" && item.listing_type !== "buy") return false
+      if (categoryFilter !== "all" && item.product_category !== categoryFilter) return false
+      return true
+    })
+  }, [pendingListings, filter, categoryFilter])
+
+  function handleDiscardPending(localId: string) {
+    removePendingListing(localId)
+    setPendingListings(getPendingListings())
+    toast.success("تم حذف الإعلان المحفوظ محلياً.")
+  }
 
   const sortedListings = useMemo(() => {
     const copy = [...listings]
@@ -652,7 +718,7 @@ export function ListingsPage() {
               <p className="text-destructive text-sm" role="alert">{error}</p>
             )}
 
-            {!loading && !error && listings.length === 0 && (
+            {!loading && !error && listings.length === 0 && visiblePendingListings.length === 0 && (
               <Card>
                 <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
                   <p className="text-muted-foreground">لا توجد إعلانات مطابقة.</p>
@@ -668,6 +734,53 @@ export function ListingsPage() {
             )}
 
             <div className="grid gap-4 md:grid-cols-2">
+              {visiblePendingListings.map((pending) => (
+                <Card key={pending.localId} className="border-amber-500/60 bg-amber-50/40 dark:bg-amber-950/20">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              pending.listing_type === "sell"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                            }`}
+                          >
+                            {pending.listing_type === "sell" ? "بيع" : "شراء"}
+                          </span>
+                          <span className="text-muted-foreground text-xs shrink-0">
+                            {CATEGORY_LABELS[pending.product_category] ?? pending.product_category}
+                          </span>
+                          <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                            في انتظار الإنترنت
+                          </span>
+                        </div>
+                        <CardTitle className="text-base leading-tight">{pending.product_name}</CardTitle>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDiscardPending(pending.localId)}
+                        className="text-muted-foreground hover:text-destructive rounded p-1 transition-colors"
+                        title="إلغاء النشر"
+                        aria-label="إلغاء النشر"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="font-semibold text-primary">
+                      {formatPrice(String(pending.price), pending.unit as Unit)}
+                    </div>
+                    <div className="text-muted-foreground">
+                      الكمية: {Number(pending.quantity).toLocaleString("ar-EG")}{" "}
+                      {UNIT_LABELS[pending.unit as Unit] ?? pending.unit}
+                    </div>
+                    {pending.description && <p className="text-muted-foreground">{pending.description}</p>}
+                  </CardContent>
+                </Card>
+              ))}
               {sortedListings.map((listing) => (
                 <ListingCard
                   key={listing.id}
